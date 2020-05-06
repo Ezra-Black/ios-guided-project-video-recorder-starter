@@ -12,18 +12,19 @@ import AVFoundation
 class CameraViewController: UIViewController {
     
     lazy private var captureSession = AVCaptureSession()
-
+    lazy private var fileOutput = AVCaptureMovieFileOutput()
+    
     @IBOutlet var recordButton: UIButton!
     @IBOutlet var cameraView: CameraPreviewView!
-
-
-	override func viewDidLoad() {
-		super.viewDidLoad()
-
-		// Resize camera preview to fill the entire screen
-		cameraView.videoPlayerView.videoGravity = .resizeAspectFill
+    
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        
+        // Resize camera preview to fill the entire screen
+        cameraView.videoPlayerView.videoGravity = .resizeAspectFill
         setUpCaptureSession()
-	}
+    }
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
@@ -34,6 +35,10 @@ class CameraViewController: UIViewController {
         captureSession.stopRunning()
     }
     
+    private func updateViews() {
+        recordButton.isSelected = fileOutput.isRecording
+    }
+    
     //Live Preview + input/outputs
     
     private func setUpCaptureSession() {
@@ -41,7 +46,7 @@ class CameraViewController: UIViewController {
         captureSession.beginConfiguration()
         //Camera input
         let camera = bestCamera()
-
+        
         //create input, verify it, add it.
         guard let cameraInput = try? AVCaptureDeviceInput(device: camera),
             captureSession.canAddInput(cameraInput) else {
@@ -58,6 +63,10 @@ class CameraViewController: UIViewController {
         
         
         //Add outputs
+        guard captureSession.canAddOutput(fileOutput) else {
+            fatalError("Cannot save video: Output issue.")
+        }
+        captureSession.addOutput(fileOutput)
         
         
         captureSession.commitConfiguration()
@@ -75,22 +84,46 @@ class CameraViewController: UIViewController {
         }
         fatalError("No camera available - are you on a simulator?")
     }
-
-
+    
+    
     @IBAction func recordButtonPressed(_ sender: Any) {
-
-	}
-	
-	/// Creates a new file URL in the documents directory
-	private func newRecordingURL() -> URL {
-		let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-
-		let formatter = ISO8601DateFormatter()
-		formatter.formatOptions = [.withInternetDateTime]
-
-		let name = formatter.string(from: Date())
-		let fileURL = documentsDirectory.appendingPathComponent(name).appendingPathExtension("mov")
-		return fileURL
-	}
+        toggleRecord()
+    }
+    
+    private func toggleRecord() {
+        if fileOutput.isRecording {
+            fileOutput.stopRecording()
+        } else {
+            fileOutput.startRecording(to: newRecordingURL(), recordingDelegate: self)
+        }
+    }
+    
+    /// Creates a new file URL in the documents directory
+    private func newRecordingURL() -> URL {
+        let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        
+        let name = formatter.string(from: Date())
+        let fileURL = documentsDirectory.appendingPathComponent(name).appendingPathExtension("mov")
+        return fileURL
+    }
 }
 
+extension CameraViewController: AVCaptureFileOutputRecordingDelegate {
+    func fileOutput(_ output: AVCaptureFileOutput, didFinishRecordingTo outputFileURL: URL, from connections: [AVCaptureConnection], error: Error?) {
+        if let error = error {
+            print("error saving video: \(error)")
+        } else {
+            //show movie
+        }
+        updateViews()
+    }
+    
+    func fileOutput(_ output: AVCaptureFileOutput, didStartRecordingTo fileURL: URL, from connections: [AVCaptureConnection]) {
+        print("Started Recording \(fileURL)")
+        updateViews()
+    }
+    
+}
