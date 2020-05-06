@@ -7,6 +7,7 @@
 //
 
 import UIKit
+import AVFoundation
 
 class ViewController: UIViewController {
 	
@@ -17,13 +18,38 @@ class ViewController: UIViewController {
 	
 	override func viewDidAppear(_ animated: Bool) {
 		super.viewDidAppear(animated)
-		
-		// TODO: get permission
-		
-		showCamera()
-		
+		requestPermissionAndShowCamera()
 	}
+    
+    //capture device lets us wrap up our inputs/outputs
+    private func requestPermissionAndShowCamera() {
+        let status = AVCaptureDevice.authorizationStatus(for: .video)
+        
+        switch status {
+        case .notDetermined: // first time we've requested access
+            requestPermission()
+        case .restricted: // parental controls prevent user from camera/mic
+            fatalError("Tell user they need to request permission from parent")
+        case .denied:
+            fatalError("enable permissions in system preferences!")
+        case .authorized:
+            showCamera()
+        default:
+            fatalError("Handle new case for authorization due to deprication")
+        }
+    }
 	
+    private func requestPermission() {
+        AVCaptureDevice.requestAccess(for: .video) { (granted) in
+            guard granted else {
+                fatalError("enable permissions in system preferences!")
+            }
+            DispatchQueue.main.async {
+                self.showCamera()
+            }
+        }
+    }
+    
 	private func showCamera() {
 		performSegue(withIdentifier: "ShowCamera", sender: self)
 	}
